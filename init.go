@@ -1,16 +1,5 @@
 package log
 
-import "sync"
-
 func init() {
-	globalConfig = &logConfig{
-		isFile:      false,
-		observers:   make([]LoggingInterface, 0, 2048),
-		observersMu: sync.Mutex{},
-		fileMu:      sync.RWMutex{},
-	}
-
 	logger = NewLoggingWithFormater("global", INFO_LEVEL, 3, globalLogFormatter)
-
-	globalConfig.Attach(logger)
 }

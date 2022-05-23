@@ -68,13 +68,6 @@ func NewLogging(name string, level LoggingLevel, callerLevel int) LoggingInterfa
 		Formater:     DefaultFormater,
 	}
 
-	//check globalConfig file is or not nil
-	if globalConfig.file != nil {
-		logging.SetOutPut(globalConfig.file)
-	}
-
-	globalConfig.Attach(logging)
-
 	return logging
 }
 
@@ -92,12 +85,6 @@ func NewLoggingWithFormater(name string, level LoggingLevel, callerLevel int, fo
 		CallerLevel:  callerLevel,
 		Formater:     formater,
 	}
-	//Check golbal file is or not  empty, not empty Change the output object at init logging
-	if globalConfig.file != nil {
-		logging.SetOutPut(globalConfig.file)
-	}
-
-	globalConfig.Attach(logging)
 
 	return logging
 }
