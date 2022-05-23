@@ -9,8 +9,8 @@ func TestInfo(t *testing.T) {
 	buf := &bytes.Buffer{}
 	testMessage := "Test Message"
 
-	logging := NewLogging("test", INFO_LEVEL, 2)
-	logging.SetOutPut(buf)
+	logging := NewLogger(nil)
+	logging.SetOutput(buf)
 
 	buf.Reset()
 	logging.Info(testMessage)
@@ -26,8 +26,8 @@ func TestLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
 	testMessage := "Test Message"
 
-	logging := NewLogging("test", INFO_LEVEL, 2)
-	logging.SetOutPut(buf)
+	logging := NewLogger(nil)
+	logging.SetOutput(buf)
 
 	buf.Reset()
 	logging.Info(testMessage)
@@ -40,8 +40,8 @@ func BenchmarkInfo(b *testing.B) {
 	testMessage := "Test Message"
 	buf := &bytes.Buffer{}
 
-	logging := NewLogging("test", INFO_LEVEL, 2)
-	logging.SetOutPut(buf)
+	logging := NewLogger(nil)
+	logging.SetOutput(buf)
 
 	for i := 0; i < b.N; i++ {
 		buf.Reset()

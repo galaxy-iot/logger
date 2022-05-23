@@ -22,8 +22,8 @@ type LoggingInterface interface {
 	Fatalf(format string, args ...interface{})
 	Close()
 
-	SetOutPut(w io.Writer)
-	SetLevel(level LoggingLevel)
+	SetOutput(w io.Writer) *logger
+	SetLevel(level LoggingLevel) *logger
 }
 
 type LoggingLevel int
@@ -53,55 +53,89 @@ func (level LoggingLevel) String() string {
 	}
 }
 
-func NewLogging(name string, level LoggingLevel, callerLevel int) LoggingInterface {
-	if level < DEBUG_LEVEL || level > FATAL_LEVEL {
-		level = INFO_LEVEL
-	}
-
-	logging := &logging{
-		Name:         name,
-		Level:        level,
-		Out:          os.Stdout,
-		Pool:         NewBufferPool(),
-		EnableCaller: true,
-		CallerLevel:  callerLevel,
-		Formater:     DefaultFormater,
-	}
-
-	return logging
-}
-
-func NewLoggingWithFormater(name string, level LoggingLevel, callerLevel int, formater Formatter) LoggingInterface {
-	if level < DEBUG_LEVEL || level > FATAL_LEVEL {
-		level = INFO_LEVEL
-	}
-
-	logging := &logging{
-		Name:         name,
-		Level:        level,
-		Out:          os.Stdout,
-		Pool:         NewBufferPool(),
-		EnableCaller: true,
-		CallerLevel:  callerLevel,
-		Formater:     formater,
-	}
-
-	return logging
-}
-
-type logging struct {
-	mux sync.Mutex
-
-	Name         string
+type LoggerConfig struct {
 	Level        LoggingLevel
-	Out          io.Writer
-	Pool         *BufferPool
 	EnableCaller bool
 	CallerLevel  int
-	Formater     func(string, LoggingLevel, int, *BufferPool, string, ...interface{}) *bytes.Buffer
+	Out          io.Writer
+	Name         string
+
+	Formater func(string, LoggingLevel, int, *BufferPool, string, ...interface{}) *bytes.Buffer
 }
 
-func (l *logging) Close() {
+func DefaultLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
+		Level:        INFO_LEVEL,
+		EnableCaller: true,
+		CallerLevel:  2,
+		Out:          os.Stdout,
+
+		Formater: DefaultFormater,
+	}
+}
+
+type logger struct {
+	mux sync.Mutex
+
+	Pool *BufferPool
+	LoggerConfig
+}
+
+func NewLogger(conf *LoggerConfig) LoggingInterface {
+	if conf == nil {
+		conf = DefaultLoggerConfig()
+	}
+
+	if conf.Level < DEBUG_LEVEL || conf.Level > FATAL_LEVEL {
+		conf.Level = INFO_LEVEL
+	}
+
+	if conf.Out == nil {
+		conf.Out = os.Stdout
+	}
+
+	return &logger{
+		Pool:         NewBufferPool(),
+		mux:          sync.Mutex{},
+		LoggerConfig: *conf,
+	}
+}
+
+func (l *logger) SetLevel(level LoggingLevel) *logger {
+	if level < DEBUG_LEVEL || level > FATAL_LEVEL {
+		level = INFO_LEVEL
+	}
+
+	l.Level = level
+	return l
+}
+
+func (l *logger) SetFormatter(formater Formatter) *logger {
+	l.Formater = formater
+	return l
+}
+
+func (l *logger) SetOutput(output io.Writer) *logger {
+	l.Out = output
+	return l
+}
+
+func (l *logger) SetModuleName(name string) *logger {
+	l.Name = name
+	return l
+}
+
+func (l *logger) SetCaller(enableCaller bool, callLevel int) *logger {
+	l.EnableCaller = enableCaller
+	l.CallerLevel = callLevel
+	return l
+}
+
+func (l *logger) Open() {
+
+}
+
+func (l *logger) Close() {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 	if closer, ok := l.Out.(io.WriteCloser); ok {
@@ -109,15 +143,10 @@ func (l *logging) Close() {
 	}
 }
 
-func (l *logging) SetOutPut(w io.Writer) {
+func (l *logger) Write(buf *bytes.Buffer) {
 	l.mux.Lock()
 	defer l.mux.Unlock()
-	l.Out = w
-}
 
-func (l *logging) Write(buf *bytes.Buffer) {
-	l.mux.Lock()
-	defer l.mux.Unlock()
 	if _, err := l.Out.Write(buf.Bytes()); err != nil {
 		panic(err)
 	}
@@ -125,39 +154,35 @@ func (l *logging) Write(buf *bytes.Buffer) {
 	l.Pool.Put(buf)
 }
 
-func (l *logging) SetLevel(level LoggingLevel) {
-	l.Level = level
-}
-
-func (l *logging) Debug(args ...interface{}) {
+func (l *logger) Debug(args ...interface{}) {
 	if l.Level <= DEBUG_LEVEL {
 		s := fmt.Sprint(args...)
 		l.Write(l.Formater(l.Name, DEBUG_LEVEL, l.CallerLevel, l.Pool, s))
 	}
 }
 
-func (l *logging) Info(args ...interface{}) {
+func (l *logger) Info(args ...interface{}) {
 	if l.Level <= INFO_LEVEL {
 		s := fmt.Sprint(args...)
 		l.Write(l.Formater(l.Name, INFO_LEVEL, l.CallerLevel, l.Pool, s))
 	}
 }
 
-func (l *logging) Warn(args ...interface{}) {
+func (l *logger) Warn(args ...interface{}) {
 	if l.Level <= WARN_LEVEL {
 		s := fmt.Sprint(args...)
 		l.Write(l.Formater(l.Name, WARN_LEVEL, l.CallerLevel, l.Pool, s))
 	}
 }
 
-func (l *logging) Error(args ...interface{}) {
+func (l *logger) Error(args ...interface{}) {
 	if l.Level <= ERROR_LEVEL {
 		s := fmt.Sprint(args...)
 		l.Write(l.Formater(l.Name, ERROR_LEVEL, l.CallerLevel, l.Pool, s))
 	}
 }
 
-func (l *logging) Fatal(args ...interface{}) {
+func (l *logger) Fatal(args ...interface{}) {
 	if l.Level <= FATAL_LEVEL {
 		s := fmt.Sprint(args...)
 		l.Write(l.Formater(l.Name, FATAL_LEVEL, l.CallerLevel, l.Pool, s))
@@ -165,31 +190,31 @@ func (l *logging) Fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func (l *logging) Debugf(format string, args ...interface{}) {
+func (l *logger) Debugf(format string, args ...interface{}) {
 	if l.Level <= DEBUG_LEVEL {
 		l.Write(l.Formater(l.Name, DEBUG_LEVEL, l.CallerLevel, l.Pool, format, args...))
 	}
 }
 
-func (l *logging) Infof(format string, args ...interface{}) {
+func (l *logger) Infof(format string, args ...interface{}) {
 	if l.Level <= INFO_LEVEL {
 		l.Write(l.Formater(l.Name, INFO_LEVEL, l.CallerLevel, l.Pool, format, args...))
 	}
 }
 
-func (l *logging) Warnf(format string, args ...interface{}) {
+func (l *logger) Warnf(format string, args ...interface{}) {
 	if l.Level <= WARN_LEVEL {
 		l.Write(l.Formater(l.Name, WARN_LEVEL, l.CallerLevel, l.Pool, format, args...))
 	}
 }
 
-func (l *logging) Errorf(format string, args ...interface{}) {
+func (l *logger) Errorf(format string, args ...interface{}) {
 	if l.Level <= ERROR_LEVEL {
 		l.Write(l.Formater(l.Name, ERROR_LEVEL, l.CallerLevel, l.Pool, format, args...))
 	}
 }
 
-func (l *logging) Fatalf(format string, args ...interface{}) {
+func (l *logger) Fatalf(format string, args ...interface{}) {
 	if l.Level <= FATAL_LEVEL {
 		l.Write(l.Formater(l.Name, FATAL_LEVEL, l.CallerLevel, l.Pool, format, args...))
 	}

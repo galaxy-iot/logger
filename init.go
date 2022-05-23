@@ -1,5 +1,11 @@
 package logger
 
 func init() {
-	logger = NewLoggingWithFormater("global", INFO_LEVEL, 3, globalLogFormatter)
+	globalLogger = NewLogger(&LoggerConfig{
+		Name:         "global",
+		Level:        INFO_LEVEL,
+		CallerLevel:  3,
+		EnableCaller: true,
+		Formater:     globalLogFormatter,
+	})
 }
