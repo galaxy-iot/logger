@@ -1,17 +1,15 @@
-package log_test
+package logger
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/wh8199/log"
 )
 
 func TestInfo(t *testing.T) {
 	buf := &bytes.Buffer{}
 	testMessage := "Test Message"
 
-	logging := log.NewLogging("test", log.INFO_LEVEL, 2)
+	logging := NewLogging("test", INFO_LEVEL, 2)
 	logging.SetOutPut(buf)
 
 	buf.Reset()
@@ -28,7 +26,7 @@ func TestLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
 	testMessage := "Test Message"
 
-	logging := log.NewLogging("test", log.INFO_LEVEL, 2)
+	logging := NewLogging("test", INFO_LEVEL, 2)
 	logging.SetOutPut(buf)
 
 	buf.Reset()
@@ -42,7 +40,7 @@ func BenchmarkInfo(b *testing.B) {
 	testMessage := "Test Message"
 	buf := &bytes.Buffer{}
 
-	logging := log.NewLogging("test", log.INFO_LEVEL, 2)
+	logging := NewLogging("test", INFO_LEVEL, 2)
 	logging.SetOutPut(buf)
 
 	for i := 0; i < b.N; i++ {
